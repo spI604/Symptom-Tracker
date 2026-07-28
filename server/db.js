@@ -6,6 +6,7 @@ const {
   getPatientLogsFromMongo,
   savePatientLogToMongo,
   deletePatientLogFromMongo,
+  deletePatientFromMongo,
 } = require('./mongo');
 
 const dbConfig = {
@@ -112,6 +113,7 @@ async function initDatabase() {
         { name: 'vitals_heart_rate', type: 'INT DEFAULT NULL' },
         { name: 'vitals_temperature', type: 'DECIMAL(5,2) DEFAULT NULL' },
         { name: 'vitals_spo2', type: 'INT DEFAULT NULL' },
+        { name: 'vitals_blood_sugar', type: 'INT DEFAULT NULL' },
         { name: 'vitals_notes', type: 'TEXT DEFAULT NULL' },
       ];
 
@@ -212,12 +214,13 @@ async function getPatientLogs(userId) {
           medicationName: row.medication_name || data.medicationName,
           medicationEffect: row.medication_effect || data.medicationEffect,
           associatedSymptoms: row.associated_symptoms ? row.associated_symptoms.split(', ') : data.associatedSymptoms,
-          vitals: (row.vitals_bp || row.vitals_heart_rate || row.vitals_temperature || row.vitals_spo2 || row.vitals_notes) ? {
+          vitals: (row.vitals_bp || row.vitals_heart_rate || row.vitals_temperature || row.vitals_spo2 || row.vitals_blood_sugar || row.vitals_notes) ? {
             systolic: row.vitals_bp ? parseInt(row.vitals_bp.split('/')[0]) : data.vitals?.systolic,
             diastolic: row.vitals_bp ? parseInt(row.vitals_bp.split('/')[1]) : data.vitals?.diastolic,
             heartRate: row.vitals_heart_rate || data.vitals?.heartRate,
             temperature: row.vitals_temperature || data.vitals?.temperature,
             oxygenSaturation: row.vitals_spo2 || data.vitals?.oxygenSaturation,
+            bloodSugar: row.vitals_blood_sugar || data.vitals?.bloodSugar,
             notes: row.vitals_notes || data.vitals?.notes,
           } : data.vitals,
         };
@@ -258,9 +261,9 @@ async function savePatientLog(userId, log) {
           symptom, descriptor, body_region, sub_regions, body_system, severity,
           began, frequency, duration, worse_triggers, better_triggers,
           medication_taken, medication_name, medication_effect, associated_symptoms,
-          vitals_bp, vitals_heart_rate, vitals_temperature, vitals_spo2, vitals_notes,
+          vitals_bp, vitals_heart_rate, vitals_temperature, vitals_spo2, vitals_blood_sugar, vitals_notes,
           log_data
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           log_type = VALUES(log_type),
           event_date_time = VALUES(event_date_time),
@@ -283,6 +286,7 @@ async function savePatientLog(userId, log) {
           vitals_heart_rate = VALUES(vitals_heart_rate),
           vitals_temperature = VALUES(vitals_temperature),
           vitals_spo2 = VALUES(vitals_spo2),
+          vitals_blood_sugar = VALUES(vitals_blood_sugar),
           vitals_notes = VALUES(vitals_notes),
           log_data = VALUES(log_data)
       `;
@@ -311,6 +315,7 @@ async function savePatientLog(userId, log) {
         log.vitals?.heartRate || null,
         log.vitals?.temperature || null,
         log.vitals?.oxygenSaturation || null,
+        log.vitals?.bloodSugar || null,
         log.vitals?.notes || null,
         JSON.stringify(fullLog),
       ];
@@ -354,10 +359,61 @@ async function deletePatientLog(userId, logId) {
   return true;
 }
 
+// Get all registered patients with log count
+async function getAllPatientsWithLogCount() {
+  if (pool && isMySqlConnected) {
+    try {
+      const [rows] = await pool.query(`
+        SELECT p.user_id AS userId, p.patient_name AS patientName, p.contact_number AS contactNumber,
+               COUNT(l.id) AS recordCount,
+               MAX(l.event_date_time) AS lastLogDate
+        FROM patients p
+        LEFT JOIN patient_logs l ON p.user_id = l.user_id
+        GROUP BY p.user_id, p.patient_name, p.contact_number
+        ORDER BY lastLogDate DESC, p.created_at DESC
+      `);
+      return rows;
+    } catch (err) {
+      console.error('Error fetching all patients from MySQL:', err.message);
+    }
+  }
+
+  const patientsMap = new Map();
+  for (const [userId, p] of memoryStore.patients.entries()) {
+    const logs = memoryStore.logs.get(userId) || [];
+    patientsMap.set(userId, {
+      userId: p.userId,
+      patientName: p.patientName,
+      contactNumber: p.contactNumber,
+      recordCount: logs.length,
+    });
+  }
+  return Array.from(patientsMap.values());
+}
+
+// Delete patient account entirely
+async function deletePatientAccount(userId) {
+  if (pool && isMySqlConnected) {
+    try {
+      await pool.query('DELETE FROM patient_logs WHERE user_id = ?', [userId]);
+      await pool.query('DELETE FROM patients WHERE user_id = ?', [userId]);
+    } catch (err) {
+      console.error('Error deleting patient from MySQL:', err.message);
+    }
+  }
+
+  await deletePatientFromMongo(userId);
+  memoryStore.patients.delete(userId);
+  memoryStore.logs.delete(userId);
+  return true;
+}
+
 module.exports = {
   initDatabase,
   findOrCreatePatient,
   getPatientLogs,
   savePatientLog,
   deletePatientLog,
+  getAllPatientsWithLogCount,
+  deletePatientAccount,
 };

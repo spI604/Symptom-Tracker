@@ -22,6 +22,7 @@ import Animated, {
 import { useHealth } from '../state/HealthContext';
 import { GlassContainer } from './GlassContainer';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,7 +32,16 @@ const getBPCategory = (sys: number, dia: number) => {
   if (sys >= 140 || dia >= 90) return { label: 'Hypertension Stage 2', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' };
   if ((sys >= 130 && sys <= 139) || (dia >= 80 && dia <= 89)) return { label: 'Hypertension Stage 1', color: '#D97706', bg: 'rgba(217, 119, 6, 0.12)' };
   if (sys >= 120 && sys <= 129 && dia < 80) return { label: 'Elevated BP', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)' };
+  if ((sys > 0 && sys < 90) || (dia > 0 && dia < 60)) return { label: 'Hypotension (Low BP)', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' };
   return { label: 'Normal BP', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' };
+};
+
+const getSugarCategory = (sugar: number) => {
+  if (sugar < 70) return { label: 'Hypoglycemia (Low Sugar)', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' };
+  if (sugar <= 99) return { label: 'Normal Fasting Sugar', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' };
+  if (sugar <= 140) return { label: 'Normal Post-Meal Sugar', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' };
+  if (sugar <= 199) return { label: 'Elevated / Pre-Diabetic', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)' };
+  return { label: 'Hyperglycemia (High Sugar)', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' };
 };
 
 const getHRCategory = (hr: number) => {
@@ -56,17 +66,19 @@ const getSpO2Category = (spo2: number) => {
 
 export const VitalsModal: React.FC = () => {
   const { isVitalsOpen, setVitalsOpen, addVitalLog, triggerHaptic } = useHealth();
+  const { t } = useLanguage();
 
   // Local state for each vital input as strings to support direct text typing
   const [systolic, setSystolic] = useState<string>('120');
   const [diastolic, setDiastolic] = useState<string>('80');
+  const [bloodSugar, setBloodSugar] = useState<string>('95');
   const [heartRate, setHeartRate] = useState<string>('72');
   const [temperature, setTemperature] = useState<string>('98.6');
   const [tempUnit, setTempUnit] = useState<'F' | 'C'>('F');
   const [oxygenSaturation, setOxygenSaturation] = useState<string>('98');
   const [notes, setNotes] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<'BP' | 'HR' | 'TEMP' | 'SPO2'>('BP');
+  const [activeTab, setActiveTab] = useState<'BP' | 'GLUCOSE' | 'HR' | 'TEMP' | 'SPO2'>('BP');
 
   // Pulsing heart animation hook
   const heartScale = useSharedValue(1);
@@ -76,7 +88,7 @@ export const VitalsModal: React.FC = () => {
       cancelAnimation(heartScale);
       return;
     }
-    const hrNum = parseInt(heartRate) || 72;
+    const hrNum = parseInt(heartRate, 10) || 72;
     const pulseDuration = 60000 / hrNum;
     // Keep it bound within reasonable bounds
     const safeDuration = Math.min(2000, Math.max(300, pulseDuration));
@@ -98,17 +110,26 @@ export const VitalsModal: React.FC = () => {
   }));
 
   const handleSave = () => {
+    const sysParsed = parseInt(systolic, 10);
+    const diaParsed = parseInt(diastolic, 10);
+    const sugarParsed = parseInt(bloodSugar, 10);
+    const hrParsed = parseInt(heartRate, 10);
+    const tempParsed = parseFloat(temperature);
+    const spo2Parsed = parseInt(oxygenSaturation, 10);
+
     addVitalLog({
-      systolic: parseInt(systolic) || 120,
-      diastolic: parseInt(diastolic) || 80,
-      temperature: parseFloat(temperature) || 98.6,
-      heartRate: parseInt(heartRate) || 72,
-      oxygenSaturation: parseInt(oxygenSaturation) || 98,
+      systolic: isNaN(sysParsed) ? 120 : sysParsed,
+      diastolic: isNaN(diaParsed) ? 80 : diaParsed,
+      bloodSugar: isNaN(sugarParsed) ? undefined : sugarParsed,
+      temperature: isNaN(tempParsed) ? (tempUnit === 'F' ? 98.6 : 37.0) : tempParsed,
+      heartRate: isNaN(hrParsed) ? 72 : hrParsed,
+      oxygenSaturation: isNaN(spo2Parsed) ? 98 : spo2Parsed,
       notes: notes.trim() ? notes.trim() : undefined,
     });
     // Reset values to defaults
     setSystolic('120');
     setDiastolic('80');
+    setBloodSugar('95');
     setHeartRate('72');
     setTemperature(tempUnit === 'F' ? '98.6' : '37.0');
     setOxygenSaturation('98');
@@ -126,37 +147,54 @@ export const VitalsModal: React.FC = () => {
     switch (vital) {
       case 'systolic':
         setSystolic((prevStr) => {
-          const prev = parseInt(prevStr) || 120;
-          return String(Math.max(70, Math.min(220, prev + (direction === 'up' ? step : -step))));
+          const parsed = parseInt(prevStr, 10);
+          const prev = isNaN(parsed) ? 120 : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
+          return String(Math.max(40, Math.min(240, next)));
         });
         break;
       case 'diastolic':
         setDiastolic((prevStr) => {
-          const prev = parseInt(prevStr) || 80;
-          return String(Math.max(40, Math.min(130, prev + (direction === 'up' ? step : -step))));
+          const parsed = parseInt(prevStr, 10);
+          const prev = isNaN(parsed) ? 80 : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
+          return String(Math.max(20, Math.min(140, next)));
+        });
+        break;
+      case 'sugar':
+        setBloodSugar((prevStr) => {
+          const parsed = parseInt(prevStr, 10);
+          const prev = isNaN(parsed) ? 95 : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
+          return String(Math.max(20, Math.min(600, next)));
         });
         break;
       case 'hr':
         setHeartRate((prevStr) => {
-          const prev = parseInt(prevStr) || 72;
-          return String(Math.max(35, Math.min(220, prev + (direction === 'up' ? step : -step))));
+          const parsed = parseInt(prevStr, 10);
+          const prev = isNaN(parsed) ? 72 : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
+          return String(Math.max(30, Math.min(240, next)));
         });
         break;
       case 'temp':
         setTemperature((prevStr) => {
-          const prev = parseFloat(prevStr) || 98.6;
-          const val = prev + (direction === 'up' ? step : -step);
+          const parsed = parseFloat(prevStr);
+          const prev = isNaN(parsed) ? (tempUnit === 'F' ? 98.6 : 37.0) : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
           if (tempUnit === 'F') {
-            return String(Math.round(Math.max(90, Math.min(110, val)) * 10) / 10);
+            return String(Math.round(Math.max(80, Math.min(115, next)) * 10) / 10);
           } else {
-            return String(Math.round(Math.max(32, Math.min(43, val)) * 10) / 10);
+            return String(Math.round(Math.max(25, Math.min(45, next)) * 10) / 10);
           }
         });
         break;
       case 'spo2':
         setOxygenSaturation((prevStr) => {
-          const prev = parseInt(prevStr) || 98;
-          return String(Math.max(75, Math.min(100, prev + (direction === 'up' ? step : -step))));
+          const parsed = parseInt(prevStr, 10);
+          const prev = isNaN(parsed) ? 98 : parsed;
+          const next = prev + (direction === 'up' ? step : -step);
+          return String(Math.max(50, Math.min(100, next)));
         });
         break;
     }
@@ -179,17 +217,26 @@ export const VitalsModal: React.FC = () => {
     }
   };
 
-  const bpInfo = getBPCategory(parseInt(systolic) || 120, parseInt(diastolic) || 80);
-  const hrInfo = getHRCategory(parseInt(heartRate) || 72);
-  const tempInfo = getTempCategory(parseFloat(temperature) || 98.6, tempUnit);
-  const spo2Info = getSpO2Category(parseInt(oxygenSaturation) || 98);
+  const sysNum = parseInt(systolic, 10);
+  const diaNum = parseInt(diastolic, 10);
+  const sugarNum = parseInt(bloodSugar, 10);
+  const hrNum = parseInt(heartRate, 10);
+  const tempNum = parseFloat(temperature);
+  const spo2Num = parseInt(oxygenSaturation, 10);
+
+  const bpInfo = getBPCategory(isNaN(sysNum) ? 120 : sysNum, isNaN(diaNum) ? 80 : diaNum);
+  const sugarInfo = getSugarCategory(isNaN(sugarNum) ? 95 : sugarNum);
+  const hrInfo = getHRCategory(isNaN(hrNum) ? 72 : hrNum);
+  const tempInfo = getTempCategory(isNaN(tempNum) ? 98.6 : tempNum, tempUnit);
+  const spo2Info = getSpO2Category(isNaN(spo2Num) ? 98 : spo2Num);
 
   // Tab configurations
   const tabs = [
-    { id: 'BP', label: 'Blood Pressure', valStr: `${systolic}/${diastolic}`, color: bpInfo.color },
-    { id: 'HR', label: 'Heart Rate', valStr: `${heartRate} bpm`, color: hrInfo.color },
-    { id: 'TEMP', label: 'Temperature', valStr: `${temperature}°${tempUnit}`, color: tempInfo.color },
-    { id: 'SPO2', label: 'Oxygen Sat', valStr: `${oxygenSaturation}%`, color: spo2Info.color },
+    { id: 'BP', label: t('Blood Pressure'), valStr: `${systolic}/${diastolic}`, color: bpInfo.color },
+    { id: 'GLUCOSE', label: t('Blood Sugar'), valStr: `${bloodSugar} mg/dL`, color: sugarInfo.color },
+    { id: 'HR', label: t('Heart Rate'), valStr: `${heartRate} bpm`, color: hrInfo.color },
+    { id: 'TEMP', label: t('Temp'), valStr: `${temperature}°${tempUnit}`, color: tempInfo.color },
+    { id: 'SPO2', label: t('Oxygen Sat'), valStr: `${oxygenSaturation}%`, color: spo2Info.color },
   ];
 
   return (
@@ -313,6 +360,142 @@ export const VitalsModal: React.FC = () => {
                   >
                     <Text style={styles.adjustBtnText}>+</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Quick Presets for BP */}
+                <View style={styles.presetsWrapper}>
+                  <Text style={styles.presetHeading}>QUICK PRESETS (1-TAP SET):</Text>
+                  <View style={styles.presetButtonsRow}>
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(59, 130, 246, 0.12)', borderColor: '#3B82F6' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('85'); setDiastolic('55'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#3B82F6' }]}>Low (85/55)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('120'); setDiastolic('80'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#10B981' }]}>Normal (120/80)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('126'); setDiastolic('78'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#F59E0B' }]}>Elevated (126/78)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(217, 119, 6, 0.12)', borderColor: '#D97706' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('135'); setDiastolic('85'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#D97706' }]}>Stage 1 (135/85)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: '#EF4444' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('145'); setDiastolic('95'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#EF4444' }]}>Stage 2 (145/95)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(153, 27, 27, 0.12)', borderColor: '#991B1B' }]}
+                      onPress={() => { triggerHaptic('selection'); setSystolic('185'); setDiastolic('125'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#991B1B' }]}>Crisis (185/125)</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* BLOOD SUGAR CELL */}
+            {activeTab === 'GLUCOSE' && (
+              <View style={styles.contentCell}>
+                <View style={[styles.statusBadge, { backgroundColor: sugarInfo.bg }]}>
+                  <Text style={[styles.statusBadgeText, { color: sugarInfo.color }]}>
+                    {sugarInfo.label}
+                  </Text>
+                </View>
+
+                <Text style={styles.sectionSubtitle}>Blood Sugar / Glucose Concentration</Text>
+                <View style={styles.adjustableRow}>
+                  <TouchableOpacity
+                    style={styles.adjustBtn}
+                    onPress={() => adjustVal('sugar', 'down')}
+                    onLongPress={() => adjustVal('sugar', 'down', 5)}
+                  >
+                    <Text style={styles.adjustBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <View style={styles.valueWrapper}>
+                    <TextInput
+                      style={[styles.largeValueInput, { color: sugarInfo.color }]}
+                      value={bloodSugar}
+                      onChangeText={(txt) => setBloodSugar(txt.replace(/[^0-9]/g, ''))}
+                      keyboardType="numeric"
+                      maxLength={3}
+                      selectTextOnFocus
+                    />
+                    <Text style={styles.valueUnit}>mg/dL</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.adjustBtn}
+                    onPress={() => adjustVal('sugar', 'up')}
+                    onLongPress={() => adjustVal('sugar', 'up', 5)}
+                  >
+                    <Text style={styles.adjustBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Presets for Blood Sugar */}
+                <View style={styles.presetsWrapper}>
+                  <Text style={styles.presetHeading}>QUICK PRESETS (1-TAP SET):</Text>
+                  <View style={styles.presetButtonsRow}>
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(59, 130, 246, 0.12)', borderColor: '#3B82F6' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('65'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#3B82F6' }]}>Low Sugar (65)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('90'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#10B981' }]}>Fasting (90)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('130'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#10B981' }]}>Post-Meal (130)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('165'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#F59E0B' }]}>Elevated (165)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: '#EF4444' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('220'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#EF4444' }]}>High (220)</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.presetChip, { backgroundColor: 'rgba(153, 27, 27, 0.12)', borderColor: '#991B1B' }]}
+                      onPress={() => { triggerHaptic('selection'); setBloodSugar('320'); }}
+                    >
+                      <Text style={[styles.presetChipText, { color: '#991B1B' }]}>Severe (320)</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -501,14 +684,14 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    maxHeight: Math.min(650, SCREEN_HEIGHT * 0.85),
+    maxHeight: Math.min(680, SCREEN_HEIGHT * 0.88),
     padding: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   headerSub: {
     color: '#2563EB',
@@ -539,32 +722,28 @@ const styles = StyleSheet.create({
   tabGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 16,
   },
   tabCell: {
     flex: 1,
-    minWidth: '45%',
-    padding: 10,
-    borderRadius: 16,
+    minWidth: '30%',
+    padding: 8,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
     backgroundColor: 'rgba(15, 23, 42, 0.03)',
     alignItems: 'center',
   },
-  tabEmoji: {
-    fontSize: 15,
-    marginBottom: 4,
-  },
   tabLabel: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '600',
     color: '#8391A5',
     marginBottom: 2,
     textTransform: 'uppercase',
   },
   tabVal: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   scrollContent: {
@@ -583,7 +762,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   statusBadgeText: {
     fontSize: 11,
@@ -595,7 +774,7 @@ const styles = StyleSheet.create({
     color: '#55657A',
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -604,7 +783,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    marginVertical: 12,
+    marginVertical: 8,
     paddingHorizontal: 8,
   },
   adjustBtn: {
@@ -631,13 +810,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
-  largeValue: {
-    fontSize: 38,
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
   largeValueInput: {
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1,
     textAlign: 'center',
@@ -653,14 +827,45 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+  presetsWrapper: {
+    width: '100%',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(22, 35, 58, 0.06)',
+    alignItems: 'center',
+  },
+  presetHeading: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    color: '#8391A5',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  presetButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
   animationContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 6,
   },
   pulseHeart: {
-    fontSize: 48,
-    marginVertical: 6,
+    fontSize: 44,
+    marginVertical: 4,
   },
   animationLabel: {
     fontSize: 9,
@@ -695,7 +900,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   notesSection: {
-    marginTop: 16,
+    marginTop: 14,
   },
   notesTitle: {
     fontSize: 11,
@@ -720,8 +925,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: 'rgba(22, 35, 58, 0.08)',
-    paddingTop: 16,
-    marginTop: 12,
+    paddingTop: 14,
+    marginTop: 10,
   },
   cancelBtn: {
     paddingVertical: 10,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 
 interface EntryModeSelectorProps {
   activeMode: 'body' | 'system';
@@ -11,6 +12,8 @@ export const EntryModeSelector: React.FC<EntryModeSelectorProps> = ({
   activeMode,
   onModeChange,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.selectorContainer}>
       <View style={styles.segmentedBg}>
@@ -20,7 +23,7 @@ export const EntryModeSelector: React.FC<EntryModeSelectorProps> = ({
           activeOpacity={0.8}
         >
           <Text style={[styles.segmentText, activeMode === 'body' && styles.segmentTextActive]}>
-            By Location
+            {t('By Location')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -29,7 +32,7 @@ export const EntryModeSelector: React.FC<EntryModeSelectorProps> = ({
           activeOpacity={0.8}
         >
           <Text style={[styles.segmentText, activeMode === 'system' && styles.segmentTextActive]}>
-            By System
+            {t('By System')}
           </Text>
         </TouchableOpacity>
       </View>

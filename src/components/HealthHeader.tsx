@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 
 interface HealthHeaderProps {
   onLogVitalsPress: () => void;
@@ -11,11 +12,13 @@ export const HealthHeader: React.FC<HealthHeaderProps> = ({
   onLogVitalsPress,
   showVitalsBtn,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.headerContainer}>
       <View style={styles.textWrapper}>
-        <Text style={styles.accentText}>HEALTH CHECK-IN</Text>
-        <Text style={styles.titleText}>How are you feeling today?</Text>
+        <Text style={styles.accentText}>{t('HEALTH CHECK-IN')}</Text>
+        <Text style={styles.titleText}>{t('How are you feeling today?')}</Text>
       </View>
       {showVitalsBtn && (
         <TouchableOpacity
@@ -23,7 +26,7 @@ export const HealthHeader: React.FC<HealthHeaderProps> = ({
           onPress={onLogVitalsPress}
           activeOpacity={0.8}
         >
-          <Text style={styles.vitalsBtnText}>Log Vitals</Text>
+          <Text style={styles.vitalsBtnText}>{t('Log Vitals')}</Text>
         </TouchableOpacity>
       )}
     </View>

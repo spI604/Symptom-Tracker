@@ -35,6 +35,7 @@ export interface HealthLog {
     temperature?: number;
     heartRate?: number;
     oxygenSaturation?: number;
+    bloodSugar?: number;
     notes?: string;
   };
 }
@@ -62,7 +63,7 @@ interface NewCheckInState {
 
 interface HealthContextType {
   currentPatient: Patient | null;
-  loginPatient: (userId: string, patientName: string, contactNumber?: string) => Promise<void>;
+  loginPatient: (userId: string, patientName?: string, contactNumber?: string) => Promise<void>;
   logoutPatient: () => void;
   logs: HealthLog[];
   isLoadingLogs: boolean;
@@ -119,7 +120,7 @@ export const HealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const loginPatient = async (userId: string, patientName: string, contactNumber?: string) => {
+  const loginPatient = async (userId: string, patientName?: string, contactNumber?: string) => {
     const patient = await loginPatientApi(userId, patientName, contactNumber);
     setCurrentPatient(patient);
     if (typeof window !== 'undefined' && window.localStorage) {

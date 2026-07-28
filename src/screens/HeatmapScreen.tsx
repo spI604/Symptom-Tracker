@@ -31,7 +31,8 @@ export const HeatmapScreen: React.FC = () => {
     const regionLogs = logs.filter((log) => {
       if (log.type === 'vital') return false;
       const isDateMatch = new Date(log.createdAt) >= cutoffDate;
-      const isRegionMatch = log.regions ? log.regions.includes(regionId) : false;
+      const isRegionMatch = (log.regions ? log.regions.includes(regionId) : false)
+        || log.bodyRegion === regionId;
       return isDateMatch && isRegionMatch;
     });
 

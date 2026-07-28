@@ -5,6 +5,7 @@ import { useHealth } from '../state/HealthContext';
 import { BODY_REGIONS } from '../data/bodyParts';
 import { getInterviewNode } from '../data/medicalKnowledge';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 import { BodySilhouette } from '../components/BodySilhouette';
 import { GlassContainer } from '../components/GlassContainer';
 
@@ -27,6 +28,7 @@ export const LogScreen: React.FC = () => {
     triggerHaptic,
     setVitalsOpen,
   } = useHealth();
+  const { t } = useLanguage();
 
   // Multi-select alert screen local states
   const [showMultiSelectPrompt, setShowMultiSelectPrompt] = useState(false);

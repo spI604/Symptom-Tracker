@@ -7,6 +7,8 @@ const {
   getPatientLogs,
   savePatientLog,
   deletePatientLog,
+  getAllPatientsWithLogCount,
+  deletePatientAccount,
 } = require('./db');
 
 const app = express();
@@ -27,7 +29,31 @@ app.use(express.static(distPath));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MedDemo Production Server & MySQL Backend API is running' });
+  res.json({ status: 'ok', message: 'MedDemo Server running — MySQL + MongoDB dual-database backend active' });
+});
+
+// Get all registered patients list endpoint
+app.get('/api/patients', async (req, res) => {
+  try {
+    const patients = await getAllPatientsWithLogCount();
+    res.json({ success: true, patients });
+  } catch (error) {
+    console.error('Error fetching patients list:', error);
+    res.status(500).json({ error: 'Failed to fetch patients list' });
+  }
+});
+
+// Delete patient account endpoint
+app.delete('/api/patients/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await deletePatientAccount(userId);
+    console.log(`🗑️ Patient account deleted: ${userId}`);
+    res.json({ success: true, message: `Patient account ${userId} deleted` });
+  } catch (error) {
+    console.error(`Error deleting patient ${req.params.userId}:`, error);
+    res.status(500).json({ error: 'Failed to delete patient account' });
+  }
 });
 
 // Patient login endpoint
@@ -38,13 +64,12 @@ app.post('/api/patients/login', async (req, res) => {
     if (!userId || !userId.trim()) {
       return res.status(400).json({ error: 'User ID is required' });
     }
-    if (!patientName || !patientName.trim()) {
-      return res.status(400).json({ error: 'Patient Name is required' });
-    }
+
+    const finalName = patientName && patientName.trim() ? patientName.trim() : 'Patient';
 
     const patient = await findOrCreatePatient({
       userId: userId.trim(),
-      patientName: patientName.trim(),
+      patientName: finalName,
       contactNumber: contactNumber ? contactNumber.trim() : null,
     });
 

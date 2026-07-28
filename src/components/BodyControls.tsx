@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 
 interface BodyControlsProps {
   isFront: boolean;
@@ -20,6 +21,7 @@ export const BodyControls: React.FC<BodyControlsProps> = ({
   const minZoom = 1.0;
   const maxZoom = 2.5;
   const sliderPercentage = (manualZoom - minZoom) / (maxZoom - minZoom);
+  const { t } = useLanguage();
 
   return (
     <View style={styles.controlsContainer}>
@@ -30,14 +32,14 @@ export const BodyControls: React.FC<BodyControlsProps> = ({
           onPress={() => onIsFrontChange(true)}
           activeOpacity={0.8}
         >
-          <Text style={[styles.toggleText, isFront && styles.toggleTextActive]}>Anterior</Text>
+          <Text style={[styles.toggleText, isFront && styles.toggleTextActive]}>{t('Anterior')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.toggleBtn, !isFront && styles.toggleActive]}
           onPress={() => onIsFrontChange(false)}
           activeOpacity={0.8}
         >
-          <Text style={[styles.toggleText, !isFront && styles.toggleTextActive]}>Posterior</Text>
+          <Text style={[styles.toggleText, !isFront && styles.toggleTextActive]}>{t('Posterior')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -90,7 +92,7 @@ export const BodyControls: React.FC<BodyControlsProps> = ({
             onPress={() => onManualZoomChange(1.0)}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetBadgeText}>Reset</Text>
+            <Text style={styles.resetBadgeText}>{t('Reset')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -98,7 +100,7 @@ export const BodyControls: React.FC<BodyControlsProps> = ({
       {/* 3. Interaction hint */}
       {showHint && (
         <Text style={styles.hintText}>
-          Tap directly on a body region or drag/zoom to capture specific areas.
+          {t('Tap directly on a body region or drag/zoom to capture specific areas.')}
         </Text>
       )}
     </View>

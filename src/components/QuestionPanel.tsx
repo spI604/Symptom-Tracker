@@ -12,6 +12,7 @@ import {
 import Animated, { FadeIn, SlideInDown, FadeInDown } from 'react-native-reanimated';
 import { GlassContainer } from './GlassContainer';
 import { COLORS } from '../theme/theme';
+import { useLanguage } from '../state/LanguageContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -101,6 +102,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
   onDiscard,
   onEventDateTimeChange,
 }) => {
+  const { t } = useLanguage();
   const [showDatePicker, setShowDatePicker] = React.useState(false);
   const [showTimePicker, setShowTimePicker] = React.useState(false);
   const [isDateHovered, setIsDateHovered] = React.useState(false);
@@ -150,7 +152,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
         {/* Header containing progress indicator */}
         <View style={styles.cardHeader}>
           <TouchableOpacity onPress={onPrevStep} style={styles.backBtn} activeOpacity={0.7}>
-            <Text style={styles.backBtnText}>✕ Back</Text>
+            <Text style={styles.backBtnText}>✕ {t('Back')}</Text>
           </TouchableOpacity>
 
           <View style={styles.progressContainer}>
@@ -162,16 +164,16 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
                 ]}
               />
             </View>
-            <Text style={styles.progressText}>{currentStep} of 9</Text>
+            <Text style={styles.progressText}>{currentStep} {t('of')} 9</Text>
           </View>
         </View>
 
         {/* Dynamic Question Title */}
-        <Text style={styles.questionTitle}>{title}</Text>
+        <Text style={styles.questionTitle}>{t(title)}</Text>
 
         {/* Retroactive Date & Time Entry */}
         <View style={styles.retroactiveContainer}>
-          <Text style={styles.retroactiveLabel}>When did this happen?</Text>
+          <Text style={styles.retroactiveLabel}>{t('When did this happen?')}</Text>
           <View style={styles.pickerRow}>
             {/* Date Pick Pill */}
             <TouchableOpacity 
@@ -348,7 +350,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.chipCustomText}>+ Other Region...</Text>
+                <Text style={styles.chipCustomText}>+ {t('Other Region...')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -383,7 +385,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.chipCustomText}>+ Other Symptom...</Text>
+                <Text style={styles.chipCustomText}>+ {t('Other Symptom...')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -849,7 +851,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
                   onPress={() => setShowCustomInput(false)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.customCancelBtnText}>Cancel</Text>
+                  <Text style={styles.customCancelBtnText}>{t('Cancel')}</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -859,7 +861,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
         {/* Footer next/discard controls */}
         <View style={styles.cardFooter}>
           <TouchableOpacity style={styles.cancelBtn} onPress={onDiscard} activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>Discard</Text>
+            <Text style={styles.cancelBtnText}>{t('Discard')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -879,7 +881,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
                   styles.nextBtnTextDisabled,
               ]}
             >
-              {currentStep === 9 ? 'Save & Complete' : 'Continue →'}
+              {currentStep === 9 ? t('Save & Complete') : t('Continue →')}
             </Text>
           </TouchableOpacity>
         </View>

@@ -232,7 +232,8 @@ export const BodySilhouette: React.FC<BodySilhouetteProps> = ({
 
     const count = logs.filter((log) => {
       const isDateMatch = new Date(log.createdAt) >= cutoffDate;
-      const isRegionMatch = log.regions ? log.regions.includes(regionId) : false;
+      const isRegionMatch = (log.regions ? log.regions.includes(regionId) : false)
+        || log.bodyRegion === regionId;
       return isDateMatch && isRegionMatch;
     }).length;
 
@@ -331,7 +332,12 @@ export const BodySilhouette: React.FC<BodySilhouetteProps> = ({
 
     const strokeColor = isSelected ? COLORS.primary : isHovered ? COLORS.highlight : 'rgba(15, 23, 42, 0.44)';
     const strokeWidth = isSelected ? 2.5 : isHovered ? 2.3 : 1.25;
-    const opacity = isSelected ? 1 : isHovered ? 1.0 : hasSelection ? 0.42 : 1;
+    // In heatmap mode, reduce the foreground body fill opacity for heated regions
+    // so the heat backing gradient shows through even before any region is selected.
+    const baseOpacity = (isHeatmap && heatWeight > 0 && !isSelected && !isHovered)
+      ? (heatWeight === 1 ? 0.32 : heatWeight > 0.4 ? 0.42 : 0.52)
+      : 1;
+    const opacity = isSelected ? 1 : isHovered ? 1.0 : hasSelection ? 0.42 : baseOpacity;
 
     return (
       <G key={regionId} pointerEvents="none">

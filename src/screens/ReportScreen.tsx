@@ -47,6 +47,7 @@ export const ReportScreen: React.FC = () => {
 
     let totalSys = 0, sysCount = 0;
     let totalDia = 0, diaCount = 0;
+    let totalSugar = 0, sugarCount = 0;
     let totalHr = 0, hrCount = 0;
     let totalTemp = 0, tempCount = 0;
     let totalSpO2 = 0, spo2Count = 0;
@@ -55,6 +56,7 @@ export const ReportScreen: React.FC = () => {
       const v = log.vitals!;
       if (v.systolic) { totalSys += v.systolic; sysCount++; }
       if (v.diastolic) { totalDia += v.diastolic; diaCount++; }
+      if (v.bloodSugar) { totalSugar += v.bloodSugar; sugarCount++; }
       if (v.heartRate) { totalHr += v.heartRate; hrCount++; }
       if (v.temperature) { totalTemp += v.temperature; tempCount++; }
       if (v.oxygenSaturation) { totalSpO2 += v.oxygenSaturation; spo2Count++; }
@@ -66,6 +68,7 @@ export const ReportScreen: React.FC = () => {
       averages: {
         systolic: sysCount ? Math.round(totalSys / sysCount) : null,
         diastolic: diaCount ? Math.round(totalDia / diaCount) : null,
+        bloodSugar: sugarCount ? Math.round(totalSugar / sugarCount) : null,
         heartRate: hrCount ? Math.round(totalHr / hrCount) : null,
         temperature: tempCount ? (totalTemp / tempCount).toFixed(1) : null,
         oxygenSaturation: spo2Count ? Math.round(totalSpO2 / spo2Count) : null,

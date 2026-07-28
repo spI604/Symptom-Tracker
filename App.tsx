@@ -16,12 +16,15 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { COLORS, GRADIENTS } from './src/theme/theme';
 import { GlassContainer } from './src/components/GlassContainer';
 import { VitalsModal } from './src/components/VitalsModal';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { LanguageProvider, useLanguage } from './src/state/LanguageContext';
 
-type TabType = 'LOG' | 'HEATMAP' | 'TIMELINE' | 'REPORT';
+type TabType = 'LOG' | 'HEATMAP' | 'TIMELINE' | 'REPORT' | 'SETTINGS';
 
 function MainAppShell() {
   const [activeTab, setActiveTab] = useState<TabType>('LOG');
   const { currentPatient, logoutPatient, triggerHaptic, currentCheckIn } = useHealth();
+  const { t } = useLanguage();
 
   if (!currentPatient) {
     return (
@@ -50,6 +53,8 @@ function MainAppShell() {
         return <TimelineScreen />;
       case 'REPORT':
         return <ReportScreen />;
+      case 'SETTINGS':
+        return <SettingsScreen />;
       default:
         return <LogScreen />;
     }
@@ -58,13 +63,15 @@ function MainAppShell() {
   const getTabLabel = (tab: TabType) => {
     switch (tab) {
       case 'LOG':
-        return { label: 'Check-In', symbol: '⊙' };
+        return { label: t('Check-In'), symbol: '⊙' };
       case 'HEATMAP':
-        return { label: 'Body Map', symbol: '✱' };
+        return { label: t('Body Map'), symbol: '✱' };
       case 'TIMELINE':
-        return { label: 'Timeline', symbol: '⎋' };
+        return { label: t('Timeline'), symbol: '⎋' };
       case 'REPORT':
-        return { label: 'Report', symbol: '▤' };
+        return { label: t('Report'), symbol: '▤' };
+      case 'SETTINGS':
+        return { label: t('Settings'), symbol: '⚙' };
     }
   };
 
@@ -103,7 +110,7 @@ function MainAppShell() {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.logoutText}>Logout</Text>
+              <Text style={styles.logoutText}>{t('Logout')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -120,7 +127,7 @@ function MainAppShell() {
           <Animated.View style={styles.tabBarContainer}>
             <GlassContainer style={styles.tabGlass} intensity={70} borderRadius={28}>
               <View style={styles.tabInner}>
-                {(['LOG', 'HEATMAP', 'TIMELINE', 'REPORT'] as TabType[]).map((tab) => {
+                {(['LOG', 'HEATMAP', 'TIMELINE', 'REPORT', 'SETTINGS'] as TabType[]).map((tab) => {
                   const isSelected = activeTab === tab;
                   const config = getTabLabel(tab);
 
@@ -164,7 +171,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <HealthProvider>
-        <MainAppShell />
+        <LanguageProvider>
+          <MainAppShell />
+        </LanguageProvider>
       </HealthProvider>
     </SafeAreaProvider>
   );

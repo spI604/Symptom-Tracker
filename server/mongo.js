@@ -67,7 +67,8 @@ async function getPatientLogsFromMongo(userId) {
     const rows = await PatientLogModel.find({ userId }).sort({ eventDateTime: -1 }).lean();
     return rows.map((row) => ({
       ...row.logData,
-      id: row.id,
+      // row.id is the app-level custom id field stored in the schema (not Mongoose _id)
+      id: row.id || (row.logData && row.logData.id) || String(row._id),
       createdAt: row.createdAt,
       eventDateTime: row.eventDateTime,
       type: row.logType,
@@ -108,10 +109,23 @@ async function deletePatientLogFromMongo(userId, logId) {
   }
 }
 
+async function deletePatientFromMongo(userId) {
+  if (!isMongoConnected) return false;
+  try {
+    await PatientModel.deleteOne({ userId });
+    await PatientLogModel.deleteMany({ userId });
+    return true;
+  } catch (err) {
+    console.error('Error deleting patient from MongoDB:', err.message);
+    return false;
+  }
+}
+
 module.exports = {
   initMongo,
   syncPatientToMongo,
   getPatientLogsFromMongo,
   savePatientLogToMongo,
   deletePatientLogFromMongo,
+  deletePatientFromMongo,
 };

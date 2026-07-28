@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, ScrollView, View } from 'react-native';
 import { COLORS } from '../theme/theme';
 import { GlassContainer } from './GlassContainer';
+import { useLanguage } from '../state/LanguageContext';
 
 interface SystemSelectorProps {
   onSelectSystem: (systemName: string) => void;
@@ -24,6 +25,8 @@ const SYSTEMS_LIST = [
 export const SystemSelector: React.FC<SystemSelectorProps> = ({
   onSelectSystem,
 }) => {
+  const { t } = useLanguage();
+
   return (
     <ScrollView
       style={styles.container}
@@ -39,8 +42,8 @@ export const SystemSelector: React.FC<SystemSelectorProps> = ({
             activeOpacity={0.7}
           >
             <GlassContainer style={styles.cardInner} intensity={30}>
-              <Text style={styles.titleText}>{sys.name}</Text>
-              <Text style={styles.descText}>{sys.desc}</Text>
+              <Text style={styles.titleText}>{t(sys.name)}</Text>
+              <Text style={styles.descText}>{t(sys.desc)}</Text>
             </GlassContainer>
           </TouchableOpacity>
         ))}

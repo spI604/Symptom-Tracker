@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -14,6 +14,7 @@ import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import { GlassContainer } from '../components/GlassContainer';
 import { COLORS } from '../theme/theme';
 import { useHealth } from '../state/HealthContext';
+import { fetchSavedPatientsApi, deletePatientAccountApi, SavedPatientSummary } from '../services/api';
 
 export const LoginScreen: React.FC = () => {
   const { loginPatient, triggerHaptic } = useHealth();
@@ -22,6 +23,39 @@ export const LoginScreen: React.FC = () => {
   const [contactNumber, setContactNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [savedPatients, setSavedPatients] = useState<SavedPatientSummary[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+
+  useEffect(() => {
+    fetchSavedPatientsApi().then((list) => {
+      if (list && list.length > 0) {
+        setSavedPatients(list);
+      }
+    });
+  }, []);
+
+  const handleDeletePatient = async (targetUserId: string) => {
+    triggerHaptic('medium');
+    await deletePatientAccountApi(targetUserId);
+    setSavedPatients((prev) => prev.filter((p) => p.userId !== targetUserId));
+    if (userId === targetUserId) {
+      setUserId('');
+      setPatientName('');
+      setContactNumber('');
+    }
+  };
+
+  const matchingPatient = savedPatients.find(
+    (p) => p.userId.toLowerCase() === userId.trim().toLowerCase()
+  );
+
+  const filteredSuggestions = userId.trim() && showSuggestions
+    ? savedPatients.filter(
+        (p) =>
+          p.userId.toLowerCase().includes(userId.trim().toLowerCase()) ||
+          p.patientName.toLowerCase().includes(userId.trim().toLowerCase())
+      )
+    : [];
 
   const handleLogin = async () => {
     setErrorMsg('');
@@ -32,17 +66,11 @@ export const LoginScreen: React.FC = () => {
       return;
     }
 
-    if (!patientName.trim()) {
-      triggerHaptic('heavy');
-      setErrorMsg('Patient Name is required.');
-      return;
-    }
-
     setLoading(true);
     triggerHaptic('medium');
 
     try {
-      await loginPatient(userId.trim(), patientName.trim(), contactNumber.trim() || undefined);
+      await loginPatient(userId.trim(), patientName.trim() || 'Patient', contactNumber.trim() || undefined);
     } catch (err: any) {
       triggerHaptic('heavy');
       setErrorMsg(err.message || 'Login failed. Please check backend connection.');
@@ -57,6 +85,7 @@ export const LoginScreen: React.FC = () => {
     setPatientName(name);
     setContactNumber(contact || '');
     setErrorMsg('');
+    setShowSuggestions(false);
   };
 
   return (
@@ -73,12 +102,20 @@ export const LoginScreen: React.FC = () => {
                 <Text style={styles.badgeText}>⚕️</Text>
               </View>
               <Text style={styles.title}>Patient Portal</Text>
-              <Text style={styles.subtitle}>Enter your details to access your personal health record</Text>
+              <Text style={styles.subtitle}>Enter your User ID to access your personal health records</Text>
             </View>
 
             {errorMsg ? (
               <Animated.View entering={FadeIn.duration(200)} style={styles.errorBox}>
                 <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+              </Animated.View>
+            ) : null}
+
+            {matchingPatient ? (
+              <Animated.View entering={FadeIn.duration(200)} style={styles.savedFoundBox}>
+                <Text style={styles.savedFoundText}>
+                  ✓ Account Found: <Text style={{ fontWeight: '800' }}>{matchingPatient.patientName}</Text> ({matchingPatient.recordCount || 0} saved logs in database)
+                </Text>
               </Animated.View>
             ) : null}
 
@@ -90,22 +127,63 @@ export const LoginScreen: React.FC = () => {
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. PAT-90210"
+                placeholder="e.g. PAT-90210 or p-101"
                 placeholderTextColor={COLORS.textMuted}
                 value={userId}
                 onChangeText={(text) => {
                   setUserId(text);
+                  setShowSuggestions(true);
                   if (errorMsg) setErrorMsg('');
+
+                  // Auto-fill patient details if exact match
+                  const match = savedPatients.find(
+                    (sp) => sp.userId.toLowerCase() === text.trim().toLowerCase()
+                  );
+                  if (match) {
+                    setPatientName(match.patientName);
+                    if (match.contactNumber) setContactNumber(match.contactNumber);
+                  }
                 }}
                 autoCapitalize="characters"
                 autoCorrect={false}
               />
+
+              {/* Autocomplete Dropdown */}
+              {filteredSuggestions.length > 0 && userId.trim() !== matchingPatient?.userId ? (
+                <View style={styles.suggestionsBox}>
+                  <Text style={styles.suggestionsTitle}>🔍 Saved Patient Accounts Found:</Text>
+                  {filteredSuggestions.map((sp) => (
+                    <View key={sp.userId} style={styles.suggestionRow}>
+                      <TouchableOpacity
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                        onPress={() => {
+                          fillQuickDemo(sp.userId, sp.patientName, sp.contactNumber || '');
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.suggestionName}>{sp.patientName}</Text>
+                          <Text style={styles.suggestionId}>ID: {sp.userId}</Text>
+                        </View>
+                        <View style={styles.recordBadge}>
+                          <Text style={styles.recordBadgeText}>{sp.recordCount} logs</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteChipBtn}
+                        onPress={() => handleDeletePatient(sp.userId)}
+                      >
+                        <Text style={styles.deleteChipText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Patient Name</Text>
-                <Text style={styles.requiredBadge}>Required</Text>
+                <Text style={styles.optionalBadge}>Optional</Text>
               </View>
               <TextInput
                 style={styles.input}
@@ -149,22 +227,46 @@ export const LoginScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
-            {/* Quick Demo Selector */}
+            {/* Quick Demo & Saved Accounts Selector */}
             <View style={styles.demoSection}>
-              <Text style={styles.demoTitle}>Quick Select Demo Patients:</Text>
+              <Text style={styles.demoTitle}>📂 Saved Patient Accounts (1-Tap Quick Access):</Text>
               <View style={styles.demoChips}>
-                <TouchableOpacity
-                  style={styles.chip}
-                  onPress={() => fillQuickDemo('P-101', 'Alice Vance', '555-0192')}
-                >
-                  <Text style={styles.chipText}>Alice (P-101)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.chip}
-                  onPress={() => fillQuickDemo('P-102', 'Bob Miller', '555-0843')}
-                >
-                  <Text style={styles.chipText}>Bob (P-102)</Text>
-                </TouchableOpacity>
+                {savedPatients.length > 0 ? (
+                  savedPatients.map((p) => (
+                    <View key={p.userId} style={[styles.chip, userId === p.userId && styles.chipActive]}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          fillQuickDemo(p.userId, p.patientName, p.contactNumber || '');
+                        }}
+                      >
+                        <Text style={[styles.chipText, userId === p.userId && styles.chipTextActive]}>
+                          👤 {p.patientName} ({p.userId}) • {p.recordCount || 0} logs
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteChipBtn}
+                        onPress={() => handleDeletePatient(p.userId)}
+                      >
+                        <Text style={styles.deleteChipText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.chip}
+                      onPress={() => fillQuickDemo('PAT-90210', 'Patient', '')}
+                    >
+                      <Text style={styles.chipText}>Patient (PAT-90210)</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.chip}
+                      onPress={() => fillQuickDemo('P-101', 'Alice Vance', '555-0192')}
+                    >
+                      <Text style={styles.chipText}>Alice (P-101)</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           </GlassContainer>
@@ -299,6 +401,74 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  savedFoundBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  savedFoundText: {
+    color: '#059669',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  suggestionsBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.25)',
+    marginTop: 6,
+    padding: 8,
+    maxHeight: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  suggestionsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 6,
+    paddingHorizontal: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(248, 250, 252, 0.8)',
+    marginBottom: 4,
+  },
+  suggestionName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  suggestionId: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  recordBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  recordBadgeText: {
+    color: '#059669',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   demoSection: {
     marginTop: 24,
     borderTopWidth: 1,
@@ -313,19 +483,42 @@ const styles = StyleSheet.create({
   },
   demoChips: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
     borderColor: 'rgba(0, 0, 0, 0.08)',
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 8,
     paddingVertical: 6,
     borderRadius: 16,
+    gap: 6,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: '#3B82F6',
   },
   chipText: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  chipTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '700',
+  },
+  deleteChipBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  deleteChipText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '700',
   },
 });

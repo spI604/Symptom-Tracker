@@ -1,6 +1,12 @@
 import { HealthLog } from '../state/HealthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// On web (Expo web / browser), the frontend is served from the same origin as the backend,
+// so relative URLs work. On native (iOS/Android device), use your machine's LAN IP.
+// To use a physical device, set EXPO_PUBLIC_API_URL in your .env file, e.g.:
+//   EXPO_PUBLIC_API_URL=http://192.168.1.100:5000/api
+const API_BASE_URL =
+  (typeof process !== 'undefined' && (process.env as any).EXPO_PUBLIC_API_URL) ||
+  'http://localhost:5000/api';
 
 export interface Patient {
   userId: string;
@@ -8,9 +14,44 @@ export interface Patient {
   contactNumber?: string;
 }
 
+export interface SavedPatientSummary {
+  userId: string;
+  patientName: string;
+  contactNumber?: string;
+  recordCount: number;
+  lastLogDate?: string;
+}
+
+export async function fetchSavedPatientsApi(): Promise<SavedPatientSummary[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/patients`);
+    const data = await response.json();
+    if (response.ok && data.success) {
+      return data.patients || [];
+    }
+    return [];
+  } catch (err) {
+    console.warn('Backend API fetch saved patients error:', err);
+    return [];
+  }
+}
+
+export async function deletePatientAccountApi(userId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/patients/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    return response.ok && data.success;
+  } catch (err) {
+    console.warn('Backend API delete patient error:', err);
+    return false;
+  }
+}
+
 export async function loginPatientApi(
   userId: string,
-  patientName: string,
+  patientName?: string,
   contactNumber?: string
 ): Promise<Patient> {
   const response = await fetch(`${API_BASE_URL}/patients/login`, {
