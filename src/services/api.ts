@@ -6,7 +6,7 @@ import { HealthLog } from '../state/HealthContext';
 //   EXPO_PUBLIC_API_URL=http://192.168.1.100:5000/api
 const API_BASE_URL =
   (typeof process !== 'undefined' && (process.env as any).EXPO_PUBLIC_API_URL) ||
-  'http://localhost:5000/api';
+  'http://localhost:5001/api';
 
 export interface Patient {
   userId: string;
